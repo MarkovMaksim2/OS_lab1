@@ -5,6 +5,7 @@
 #include <userenv.h>
 #include <ctime>
 #include <filesystem>
+#include <git2.h>
 
 #include "Output.hpp"
 
@@ -26,6 +27,33 @@ const int OutputDebug = -1;
 const int OutputInfo = 0;
 const int OutputWarning = 1;
 const int OutputError = 2;
+
+std::string get_current_branch(const std::string& repo_path) {
+    git_libgit2_init();
+
+    git_repository* repo = nullptr;
+    if (git_repository_open(&repo, repo_path.c_str()) != 0) {
+        git_libgit2_shutdown();
+        return "";
+    }
+
+    git_reference* head = nullptr;
+    if (git_repository_head(&head, repo) == 0) {
+        const char* branch_name = nullptr;
+        if (git_reference_is_branch(head)) {
+            branch_name = git_reference_shorthand(head);
+            return branch_name;
+        } else {
+            return "";
+        }
+        git_reference_free(head);
+    } else {
+        return "";
+    }
+
+    git_repository_free(repo);
+    git_libgit2_shutdown();
+}
 
 void m2ma::app::shell::Output::Println(const std::string& message) {
   std::cout << message << '\n';
@@ -91,5 +119,13 @@ void m2ma::app::shell::Output::DisplayPs() {
   std::cout << GRAY << "[" << RESET << curr_time_color_
             << timeinfo->tm_hour << ":"
             << timeinfo->tm_min
-            << RESET << GRAY << "]" << RESET << "> ";
+            << RESET << GRAY << "]" << RESET;
+
+  std::string branch = get_current_branch(cwd.string());
+  if (branch != "") {
+    std::cout << GRAY << "[" << RESET << RED << branch
+              << GRAY << "]" << RESET;
+  }
+
+  std::cout << "> ";
 }
